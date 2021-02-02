@@ -7,21 +7,18 @@ import requests
 import os
 import shutil
 
-my_directory = "/Users/billellwood/Desktop"
 
+#GDP data is not available through API, so automating download of latest release file
+#from website
+my_directory = "/Users/billellwood/Desktop"
 os.chdir(my_directory)
 gdp_url = "https://www.abs.gov.au/statistics/economy/national-accounts/australian-national-accounts-national-income-expenditure-and-product/sep-2020/5206001_Key_Aggregates.xls"
 r = requests.get(gdp_url, allow_redirects=True)
 open('GDP_excel.xls', 'wb').write(r.content)
-
 gdp_data = pd.ExcelFile("GDP_excel.xls")
-
 gdp_data = pd.read_excel(gdp_data, 'Data1', usecols = "BB")
-
 gdp_data.rename( columns={"Gross domestic product: Chain volume measures ;.1":"GDP"}, inplace=True )
-
 gdp_data = gdp_data.drop([0,1,2,3,4,5,6,7,8,9])
-
 gdp_data['date'] = pd.date_range(start='12/1/1959', periods = len(gdp_data), freq='Q')
 
 
@@ -79,21 +76,9 @@ class API_AUS_Economic_Indicators:
         
     def graph_data(self, series_name, title):
         AUS_Economic_Indicators.plot(x = 'Quarter', y = series_name, title =series_name)
+        pass
         
         
-        
-           
-    
-    
-    
-
-
-
-
-
-
-
-
 
 class CPI:
     
