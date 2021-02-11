@@ -5,29 +5,9 @@ import urllib as url
 import matplotlib.pyplot as plt
 import requests
 import os
-import shutil
 
 
-#GDP data is not available through API, so automating download of latest release file
-#from website
-my_directory = "/Users/billellwood/Desktop"
-os.chdir(my_directory)
-gdp_url = "https://www.abs.gov.au/statistics/economy/national-accounts/australian-national-accounts-national-income-expenditure-and-product/sep-2020/5206001_Key_Aggregates.xls"
-r = requests.get(gdp_url, allow_redirects=True)
-open('GDP_excel.xls', 'wb').write(r.content)
-gdp_data = pd.ExcelFile("GDP_excel.xls")
-gdp_data = pd.read_excel(gdp_data, 'Data1', usecols = "BB")
-gdp_data.rename( columns={"Gross domestic product: Chain volume measures ;.1":"GDP"}, inplace=True )
-gdp_data = gdp_data.drop([0,1,2,3,4,5,6,7,8,9])
-gdp_data['date'] = pd.date_range(start='12/1/1959', periods = len(gdp_data), freq='Q')
-
-
-print(gdp_data.head())
-
-gdp_data.iloc[200::].plot(x='date', y = 'GDP')
-
-
-plt.xlabel("Year")
+#GDP data is not available through API, so automating download of latest release file from website
 
 class API_AUS_Economic_Indicators:
     def __init__(self, startPeriod, endPeriod):
@@ -50,22 +30,27 @@ class API_AUS_Economic_Indicators:
                         "/1.100.10.Q/all?detail=Full&dimensionA"
                         "tObservation=AllDimensions&startPeriod="
                         + self.startPeriod + "&endPeriod=" + self.endPeriod))
+    def initialise_GDP(self):
+        my_directory = "/Users/billellwood/Desktop"
+        os.chdir(my_directory)
+        self.gdp_url = "https://www.abs.gov.au/statistics/economy/national-accounts/australian-national-accounts-national-income-expenditure-and-product/sep-2020/5206001_Key_Aggregates.xls"
+        r = requests.get(gdp_url, allow_redirects=True)
+        open('GDP_excel.xls', 'wb').write(r.content)
     
-      
     
     def collect_from_api(self):
-        open_URL = url.request.urlopen(self.link)
+        open_URL = url.request.urlopen(self.absAPI)
         byte_data = open_URL.read()
         string_data = byte_data.decode('utf-8') 
-        self.json_data = json.loads(string_data)
+        return json.loads(string_data)
         
     def json_to_dataframe(self, series_name):
         #clean up observations
-        data_location = list((self.jsondata['dataSets'][0]['observations']).values())
+        data_location = list((self.collect_from_api()['dataSets'][0]['observations']).values())
         clean_data = [i[0] for i in data_location]
         
         #clean up dates
-        date_location = (self.jsondata['structure']['dimensions']['observation'][-1]['values'])
+        date_location = (self.collect_from_api()['structure']['dimensions']['observation'][-1]['values'])
         clean_dates = [i['name'] for i in date_location]
         #changing format from 2018-Q3 to SQ18
         clean_dates = [i[0] + 'Q' + i[-2::] for i in clean_dates]
@@ -75,88 +60,38 @@ class API_AUS_Economic_Indicators:
         self.df = pd.DataFrame.from_dict(joined_dict)
         
     def graph_data(self, series_name, title):
-        AUS_Economic_Indicators.plot(x = 'Quarter', y = series_name, title =series_name)
+        self.df.plot(x = 'Quarter', y = series_name, title =series_name)
         pass
         
-        
+#Getting latest release into the environment and the appropriate columns of excel file
+my_directory = "/Users/billellwood/Desktop"
+os.chdir(my_directory)
+gdp_url = "https://www.abs.gov.au/statistics/economy/national-accounts/australian-national-accounts-national-income-expenditure-and-product/sep-2020/5206001_Key_Aggregates.xls"
+r = requests.get(gdp_url, allow_redirects=True)
+open('GDP_excel.xls', 'wb').write(r.content)
+gdp_data = pd.ExcelFile("GDP_excel.xls")
+gdp_data = pd.read_excel(gdp_data, 'Data1', usecols = "BB")
+gdp_data.rename( columns={"Gross domestic product: Chain volume measures ;.1":"GDP"}, inplace=True )
+gdp_data = gdp_data.drop([0,1,2,3,4,5,6,7,8,9])
+gdp_data['date'] = pd.date_range(start='12/1/1959', periods = len(gdp_data), freq='Q')
+gdp_data.iloc[200::].plot(x='date', y = 'GDP')
+plt.xlabel("Year")
 
-class CPI:
-    
-    def __init__(self, startPeriod, endPeriod):
-        self.startPeriod = startPeriod
-        self.endPeriod = endPeriod
-        self.link = ("http://stat.data.abs.gov.au/sdmx-json/data/CPI/3.1.10001.10.Q/all?detail=Full&dimensionAtObservation=AllDimensions&startPeriod=" + self.startPeriod + "&endPeriod=" + self.endPeriod)
-    
-    def source_data_from_api(self):
-        openurl = url.request.urlopen(self.link)
-        dirty_data = openurl.read()
-        dirty_data_string = dirty_data.decode('utf-8')
-        self.jsondata= json.loads(dirty_data_string)
-        return self.jsondata
-    
-    def json_to_dataframe(self):
-        obs = list((self.jsondata['dataSets'][0]['observations']).values())
-        clean_data = [i[0] for i in obs]
-        dirty_dates = ((self.jsondata['structure']['dimensions']['observation']))
-        dirty_dates = dirty_dates[-1]['values']
-        clean_dates = [i['name'] for i in dirty_dates]
-        clean_dates = [i[0] + 'Q' + i[-2::] for i in clean_dates]
-        joined_dict = {'Quarter': clean_dates, 'Year-on-year CPI': clean_data}
-        self.df = pd.DataFrame.from_dict(joined_dict)
-    
-    def graph_data(self):
-        Graph = CPI.plot(x = 'Quarter', y = 'Year-on-year CPI',
-                         title = 'AUS Inflation')
-        plt.ylabel("Year on year inflation")
-        
-inflation_object = CPI('2018-Q3', '2020-Q3')
-inflation_object.source_data_from_api()
-inflation_object.json_to_dataframe()
-
-
-class UnemploymentRate:
-    
-    def __init__(self, startPeriod, endPeriod):
-        self.startPeriod = startPeriod
-        self.endPeriod = endPeriod
-        self.link = ("http://stat.data.abs.gov.au/sdmx-json/data/LF/0.14.3.1599.10.M/all?detail=Full&dimensionAtObservation=AllDimensions&startPeriod="+self.startPeriod+"&endPeriod="+self.endPeriod)
-    
-    def source_data_from_api(self):
-        openurl = url.request.urlopen(self.link)
-        dirty_data = openurl.read()
-        dirty_data_string = dirty_data.decode('utf-8')
-        self.jsondata= json.loads(dirty_data_string)
-        return self.jsondata
-    
-    def json_to_dataframe(self):
-        obs = list((self.jsondata['dataSets'][0]['observations']).values())
-        clean_data = [i[0] for i in obs]
-        dirty_dates = ((self.jsondata['structure']['dimensions']['observation']))
-        dirty_dates = dirty_dates[-1]['values']
-        clean_dates = [i['name'] for i in dirty_dates]
-        clean_dates = [i[0] + 'Q' + i[-2::] for i in clean_dates]
-        joined_dict = {'Quarter': clean_dates, 'Year-on-year CPI': clean_data}
-        self.df = pd.DataFrame.from_dict(joined_dict)         
-
-
-
-
-###LABOUR FORCE
-
-
-
-UR_link = ("http://stat.data.abs.gov.au/sdmx-json/data/LF/0.14.3.1599.10.M/all?detail=Full&dimensionAtObservation=AllDimensions&startPeriod=2020-08&endPeriod=2020-11")
-
-
-UR_webpg = url.request.urlopen(UR_link)
-UR_dirty_data = UR_webpg.read()
-UR_dirty_data_string = UR_dirty_data.decode('utf-8')
-UR_json_ob = json.loads(UR_dirty_data_string)
-
-UR_obs = list((UR_json_ob['dataSets'][0]['observations']).values())
-UR_clean_data = [i[0] for i in UR_obs]
-
-
+cpi = API_AUS_Economic_Indicators("2005-Q1", "2020-Q2")
+cpi.initialise_CPI_API()
+cpi.collect_from_api()
+cpi.json_to_dataframe("Australian inflation rate")
+cpi.graph_data("Australian inflation rate", "Australian inflation rate")
+unempl = API_AUS_Economic_Indicators("2010-Q1", "2020-Q2")
+unempl.initialise_LF_API()
+unempl.collect_from_api()
+unempl.json_to_dataframe("Australian unemployment rate")
+unempl.graph_data("Australian unemployment rate", "Australian inflation rate")
+curr = API_AUS_Economic_Indicators("2010-Q1", "2020-Q2")
+curr.initialise_current_account_API()
+curr.collect_from_api()
+curr.json_to_dataframe("Australian current account")
+curr.graph_data("Australian current account", "Australian inflation rate")
 
 
 
